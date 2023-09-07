@@ -1,23 +1,24 @@
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import Head from "next/head";
-import { GetServerSideProps } from "next";
+import { GetStaticProps } from "next";
 import Image from "next/image";
 
-import { useKeenSlider } from 'keen-slider/react' 
-import 'keen-slider/keen-slider.min.css'
+import { useKeenSlider } from "keen-slider/react";
+import "keen-slider/keen-slider.min.css";
 
 import { HomeContainer, Product } from "@/styles/pages/home";
-
+import { priceFormatter } from "@/utils/formatter";
+import Link from "next/link";
 
 interface HomeProps {
-  products:{
-    id: string,
-    name: string,
-    imageUrl: string,
-    description?: string,
-    price: string,
-  }[]
+  products: {
+    id: string;
+    name: string;
+    imageUrl: string;
+    description?: string;
+    price: string;
+  }[];
 }
 
 export default function Home({ products }: HomeProps) {
@@ -41,49 +42,48 @@ export default function Home({ products }: HomeProps) {
       <Head>
         <title>Home | Ignite Shop</title>
       </Head>
-     
+
       <HomeContainer ref={sliderRef} className="keen-slider">
         {products.map((product) => {
           return (
-            <Product key={product.id} className="keen-slider__slide">
-              <Image src={product.imageUrl} width={520} height={480} alt="" />
-              <footer>
-                <strong>{product.name}</strong>
-                <span>{product.price}</span>
-              </footer>
-            </Product>
+            <Link href={`/product/${product.id}`} key={product.id}>
+              <Product className="keen-slider__slide">
+                <Image src={product.imageUrl} width={520} height={480} alt="" />
+                <footer>
+                  <strong>{product.name}</strong>
+                  <span>{product.price}</span>
+                </footer>
+              </Product>
+            </Link>
           );
         })}
-        
-        
       </HomeContainer>
     </>
   );
 }
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getStaticProps: GetStaticProps = async () => {
   const response = await stripe.products.list({
-    expand:['data.default_price']
-  })
+    expand: ["data.default_price"],
+  });
 
-  
+  const products = response.data.map((product) => {
+    const price = product.default_price as Stripe.Price;
 
-const products = response.data.map(product => {
-  const price = product.default_price as Stripe.Price
-
-  return {
-    id: product.id,
-    name: product.name,
-    imageUrl: product.images[0],
-    description: product.description,
-    price: price.unit_amount,
-
-  }
-})
+    return {
+      id: product.id,
+      name: product.name,
+      imageUrl: product.images[0],
+      description: product.description,
+      price:
+        price.unit_amount && priceFormatter.format(price.unit_amount / 100),
+    };
+  });
 
   return {
     props: {
-      products
-    }
-  }
-}
+      products,
+    },
+    revalidate: 60 * 60 * 2, // 2 hours
+  };
+};
